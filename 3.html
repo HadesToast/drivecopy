@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4285F4;
+            --danger-color: #DB4437;
+            --warning-color: #F4B400;
+            --success-color: #0F9D58;
+            --bg-color: #f8f9fa;
+            --text-color: #3c4043;
+            --border-color: #dadce0;
+        }
+        body { font-family: 'Roboto', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 24px; font-size: 14px; }
+        .hidden { display: none !important; }
+        .card { background-color: #fff; border-radius: 8px; border: 1px solid var(--border-color); padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06); }
+        h3 { font-size: 20px; font-weight: 500; margin: 0 0 16px 0; }
+        .form-group { margin-bottom: 16px; }
+        label { font-weight: 500; display: block; margin-bottom: 6px; }
+        input[type="text"] { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; }
+        input[type="text"]:focus { border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2); }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .button {
+            padding: 10px 16px; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; transition: background-color 0.2s;
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-primary { background-color: var(--primary-color); color: #fff; }
+        .btn-primary:hover:not(:disabled) { background-color: #3367D6; }
+        .btn-secondary { background-color: #fff; color: var(--primary-color); border: 1px solid var(--border-color); }
+        .btn-secondary:hover:not(:disabled) { background-color: #f1f3f4; }
+        .btn-danger { background-color: var(--danger-color); color: #fff; }
+        .button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .loader { width: 18px; height: 18px; border: 2px solid currentColor; border-bottom-color: transparent; border-radius: 50%; display: inline-block; box-sizing: border-box; animation: rotation 1s linear infinite; }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .status-view { text-align: center; }
+        .status-icon { font-size: 48px; margin-bottom: 16px; }
+        .info-box { background-color: #e8f0fe; border-left: 4px solid var(--primary-color); color: #174ea6; padding: 16px; border-radius: 8px; margin-bottom: 16px; text-align: left;}
+        
+        .progress-bar-container { width: 100%; background-color: #e9ecef; border-radius: 4px; overflow: hidden; margin-top: 12px; }
+        .progress-bar { height: 12px; width: 0%; background-color: var(--primary-color); transition: width 0.5s ease-in-out; }
+        #progress-text { margin-top: 8px; font-size: 12px; color: #5f6368; }
+    </style>
+</head>
+<body>
+    <div id="loading-view" class="status-view">
+        <div class="loader" style="width: 32px; height: 32px; color: var(--primary-color); margin: 20px auto;"></div>
+        <p>Memuat status...</p>
+    </div>
+
+    <!-- Tampilan Utama (Form Input) -->
+    <div id="main-view" class="hidden">
+        <div class="card">
+            <h3>🚀 Remote Control</h3>
+            <form id="jobForm">
+                <div class="form-group">
+                    <label for="sourceFolderUrl">URL atau ID Folder Sumber</label>
+                    <input type="text" id="sourceFolderUrl" required>
+                </div>
+                <div class="form-group">
+                    <label for="newFolderName">Nama Folder Baru (Tujuan)</label>
+                    <input type="text" id="newFolderName" required>
+                </div>
+                <div class="form-group">
+                    <label for="destinationFolderUrl">Folder Tujuan Penyimpanan (Opsional)</label>
+                    <input type="text" id="destinationFolderUrl" placeholder="Kosongkan untuk simpan di 'My Drive'">
+                </div>
+                 <div class="form-group">
+                    <label>Opsi</label>
+                    <label class="checkbox-group" for="skipExisting">
+                       <input type="checkbox" id="skipExisting" checked>Lewati file/folder yang sudah ada
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="button-group" style="display: flex; gap: 12px;">
+            <button id="startCopyBtn" class="button btn-primary">🛰️ Mulai Penyalinan</button>
+            <button id="startDryRunBtn" class="button btn-secondary">🔬 Mode Validasi</button>
+        </div>
+    </div>
+
+    <!-- Tampilan Saat Proses Berjalan -->
+    <div id="progress-view" class="hidden status-view">
+        <div class="card">
+            <h3 id="progress-title">Proses Sedang Berjalan...</h3>
+            <div class="info-box">
+              <p style="margin:0; font-weight: 500;">Proses berjalan di server. Anda bisa menutup jendela ini dan proses akan tetap berjalan.</p>
+              <p style="margin:8px 0 0 0;">Pantau detailnya secara langsung di sheet <b>"🚀 Mission Control"</b>.</p>
+            </div>
+            
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <p id="progress-text">Menghitung item... (0%)</p>
+            <p id="progress-status-message" style="font-size:12px; font-style: italic; color: #5f6368; min-height: 16px; margin-top: 4px;"></p>
+
+            <button id="stopBtn" class="button btn-danger" style="margin-top: 20px;">🛑 Hentikan Proses</button>
+        </div>
+    </div>
+    
+    <!-- Tampilan Saat Ada Proses yang Bisa Dilanjutkan -->
+    <div id="resume-view" class="hidden status-view">
+        <div class="card info-box">
+             <h3>🛰️ Ditemukan Progres Tersimpan</h3>
+             <p>Pekerjaan untuk menyalin folder "<b><span id="resumeFolderName"></span></b>" belum selesai. Anda bisa melanjutkannya dari titik terakhir.</p>
+        </div>
+        <div class="button-group" style="display: flex; gap: 12px; justify-content: center;">
+            <button id="resumeBtn" class="button btn-primary">▶️ Lanjutkan</button>
+            <button id="resetBtn" class="button btn-secondary">🗑️ Buang & Mulai Baru</button>
+        </div>
+    </div>
+
+    <!-- Tampilan Hasil Akhir -->
+    <div id="final-view" class="hidden status-view">
+        <div class="card">
+            <div id="final-icon" class="status-icon"></div>
+            <h3 id="final-title"></h3>
+            <p id="final-message"></p>
+        </div>
+        <button onclick="google.script.host.close()" class="button btn-primary">Tutup</button>
+    </div>
+
+<script>
+    let progressInterval = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+        google.script.run.withSuccessHandler(handleInitialState).getInitialState();
+    });
+
+    const views = ['loading-view', 'main-view', 'progress-view', 'resume-view', 'final-view'];
+    function setView(viewId) {
+        views.forEach(id => document.getElementById(id).classList.toggle('hidden', id !== viewId));
+    }
+
+    function handleInitialState(state) {
+        if (state.resumable) {
+            document.getElementById('resumeFolderName').textContent = state.jobData.newFolderName;
+            setView('resume-view');
+        } else {
+            setView('main-view');
+        }
+    }
+
+    function startJob(isDryRun) {
+        const jobConfig = {
+            sourceFolderUrl: document.getElementById('sourceFolderUrl').value.trim(),
+            newFolderName: document.getElementById('newFolderName').value.trim(),
+            destinationFolderUrl: document.getElementById('destinationFolderUrl').value.trim(),
+            skipExisting: document.getElementById('skipExisting').checked,
+            isDryRun: isDryRun
+        };
+
+        if (!jobConfig.sourceFolderUrl || !jobConfig.newFolderName) {
+            alert('Folder Sumber dan Nama Folder Baru wajib diisi.');
+            return;
+        }
+
+        document.getElementById('progress-title').textContent = isDryRun ? '🔬 Memvalidasi...' : '🛰️ Menyalin...';
+        setView('progress-view');
+        startProgressPolling();
+        
+        google.script.run.withSuccessHandler(handleJobEnd).withFailureHandler(handleFailure).startCopyJob(jobConfig);
+    }
+    
+    function startProgressPolling() {
+        if (progressInterval) clearInterval(progressInterval);
+        updateProgressView(); 
+        progressInterval = setInterval(updateProgressView, 2000);
+    }
+
+    function updateProgressView() {
+        google.script.run.withSuccessHandler(onProgressUpdate).getJobProgress();
+    }
+
+    function onProgressUpdate(progress) {
+        if (!progress || document.getElementById('progress-view').classList.contains('hidden')) return;
+
+        const total = progress.total > 0 ? progress.total : 1;
+        const percentage = Math.min(100, Math.round((progress.processed / total) * 100));
+        
+        document.getElementById('progressBar').style.width = percentage + '%';
+        document.getElementById('progress-text').textContent = `${progress.processed} / ${total} (${percentage}%)`;
+        document.getElementById('progress-status-message').textContent = progress.statusMessage;
+
+        if (progress.stopRequested) {
+            const stopBtn = document.getElementById('stopBtn');
+            if(!stopBtn.disabled) {
+              stopBtn.disabled = true;
+              stopBtn.innerHTML = '<span class="loader"></span> Menghentikan...';
+            }
+        }
+    }
+
+    // --- Event Listeners ---
+    document.getElementById('startCopyBtn').addEventListener('click', () => startJob(false));
+    document.getElementById('startDryRunBtn').addEventListener('click', () => startJob(true));
+    
+    document.getElementById('resumeBtn').addEventListener('click', (e) => {
+        e.target.disabled = true;
+        setView('progress-view');
+        startProgressPolling();
+        google.script.run.withSuccessHandler(handleJobEnd).withFailureHandler(handleFailure).resumeCopyJob();
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', (e) => {
+        if (confirm("Yakin ingin membuang progres tersimpan dan memulai baru? Aksi ini tidak bisa dibatalkan.")) {
+            e.target.disabled = true;
+            setView('loading-view');
+            google.script.run.withSuccessHandler(() => setView('main-view')).resetFromDialog();
+        }
+    });
+
+    document.getElementById('stopBtn').addEventListener('click', (e) => {
+        const btn = e.target;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loader"></span> Menghentikan...';
+        google.script.run.requestStopProcess();
+    });
+
+    function handleJobEnd(result) {
+        if (progressInterval) clearInterval(progressInterval);
+        
+        if (!result || !result.status) {
+            handleFailure({ message: "Server memberikan respons yang tidak terduga atau gagal memulai." });
+            return;
+        }
+
+        setView('final-view');
+        const icon = document.getElementById('final-icon');
+        const title = document.getElementById('final-title');
+        const msg = document.getElementById('final-message');
+
+        if (result.status === 'completed') {
+            icon.textContent = '✅';
+            title.textContent = result.isDryRun ? 'Validasi Selesai' : 'Proses Selesai';
+            msg.innerHTML = result.isDryRun 
+                ? 'Simulasi selesai. Periksa sheet "Mission Control" untuk melihat laporan lengkapnya.'
+                : `Penyalinan berhasil! Lihat laporan di "Mission Control" atau <a href="${result.newFolderUrl}" target="_blank">buka folder baru Anda di sini</a>.`;
+        } else if (result.status === 'stopped') {
+            icon.textContent = '🟡';
+            title.textContent = 'Proses Dihentikan';
+            msg.textContent = 'Progres Anda telah disimpan. Buka kembali Remote Control untuk melanjutkannya.';
+        } else if (result.status === 'error') {
+            handleFailure({ message: result.message });
+        }
+    }
+
+    function handleFailure(error) {
+        if (progressInterval) clearInterval(progressInterval);
+        setView('final-view');
+        document.getElementById('final-icon').textContent = '⛔';
+        document.getElementById('final-title').textContent = 'Terjadi Error Kritis';
+        document.getElementById('final-message').textContent = `Proses tidak dapat dilanjutkan. Periksa sheet "Mission Control" untuk detail log. Pesan Error: ${error.message}`;
+    }
+</script>
+</body>
+</html>
