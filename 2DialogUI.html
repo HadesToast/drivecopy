@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4285F4;
+            --danger-color: #DB4437;
+            --warning-color: #F4B400;
+            --success-color: #0F9D58;
+            --bg-color: #f8f9fa;
+            --text-color: #3c4043;
+            --border-color: #dadce0;
+        }
+        body { font-family: 'Roboto', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 24px; font-size: 14px; }
+        .hidden { display: none !important; }
+        .card { background-color: #fff; border-radius: 8px; border: 1px solid var(--border-color); padding: 20px; margin-bottom: 16px; }
+        h3 { font-size: 20px; font-weight: 500; margin: 0 0 16px 0; }
+        .form-group { margin-bottom: 16px; }
+        label { font-weight: 500; display: block; margin-bottom: 6px; }
+        input[type="text"] { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; }
+        input[type="text"]:focus { border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2); }
+        .options-group { display: flex; align-items: center; gap: 16px; margin-top: 16px; }
+        .button {
+            padding: 10px 16px; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; transition: background-color 0.2s;
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-primary { background-color: var(--primary-color); color: #fff; }
+        .btn-primary:hover { background-color: #3367D6; }
+        .btn-secondary { background-color: #fff; color: var(--primary-color); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background-color: #f1f3f4; }
+        .btn-danger { background-color: var(--danger-color); color: #fff; }
+        .btn-warning { background-color: var(--warning-color); color: #fff; }
+
+        .loader { width: 18px; height: 18px; border: 2px solid #fff; border-bottom-color: transparent; border-radius: 50%; display: inline-block; box-sizing: border-box; animation: rotation 1s linear infinite; }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .status-view { text-align: center; }
+        .status-icon { font-size: 48px; margin-bottom: 16px; }
+        .info-box { background-color: #e8f0fe; border: 1px solid #d2e3fc; color: #174ea6; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+    </style>
+</head>
+<body>
+    <div id="loading-view">
+        <p>Memuat status...</p>
+    </div>
+
+    <!-- Tampilan Utama (Form Input) -->
+    <div id="main-view" class="hidden">
+        <div class="card">
+            <h3>🚀 Remote Control</h3>
+            <form id="jobForm">
+                <div class="form-group">
+                    <label for="sourceFolderUrl">URL atau ID Folder Sumber</label>
+                    <input type="text" id="sourceFolderUrl" required>
+                </div>
+                <div class="form-group">
+                    <label for="newFolderName">Nama Folder Baru (Tujuan)</label>
+                    <input type="text" id="newFolderName" required>
+                </div>
+                <div class="form-group">
+                    <label for="destinationFolderUrl">Folder Tujuan Penyimpanan (Opsional)</label>
+                    <input type="text" id="destinationFolderUrl" placeholder="Kosongkan untuk simpan di 'My Drive'">
+                </div>
+                 <div class="form-group">
+                    <label>Opsi</label>
+                    <div class="options-group">
+                       <input type="checkbox" id="skipExisting" checked><label for="skipExisting">Lewati file yang sudah ada</label>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="button-group" style="display: flex; gap: 12px;">
+            <button id="startCopyBtn" class="button btn-primary">🛰️ Mulai Penyalinan</button>
+            <button id="startDryRunBtn" class="button btn-secondary">🔬 Mode Validasi</button>
+        </div>
+    </div>
+
+    <!-- Tampilan Saat Proses Berjalan -->
+    <div id="progress-view" class="hidden status-view">
+        <div class="card">
+            <h3 id="progress-title">Proses Sedang Berjalan...</h3>
+            <p>Anda bisa memantau progres secara detail di sheet <b>"🚀 Mission Control"</b>.</p>
+            <button id="stopBtn" class="button btn-danger" style="margin-top: 20px;">🛑 Hentikan Proses</button>
+        </div>
+    </div>
+    
+    <!-- Tampilan Saat Ada Proses yang Bisa Dilanjutkan -->
+    <div id="resume-view" class="hidden status-view">
+        <div class="card info-box">
+             <h3>🛰️ Ditemukan Progres Tersimpan</h3>
+             <p>Ditemukan pekerjaan untuk folder "<b><span id="resumeFolderName"></span></b>" yang belum selesai. Anda bisa melanjutkannya.</p>
+        </div>
+        <div class="button-group" style="display: flex; gap: 12px;">
+            <button id="resumeBtn" class="button btn-primary">▶️ Lanjutkan</button>
+            <button id="resetBtn" class="button btn-secondary">🗑️ Mulai Baru</button>
+        </div>
+    </div>
+
+    <!-- Tampilan Hasil Akhir -->
+    <div id="final-view" class="hidden status-view">
+        <div class="card">
+            <div id="final-icon" class="status-icon"></div>
+            <h3 id="final-title"></h3>
+            <p id="final-message"></p>
+        </div>
+        <button onclick="google.script.host.close()" class="button btn-primary">Tutup</button>
+    </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        google.script.run.withSuccessHandler(handleInitialState).getInitialState();
+    });
+
+    const views = ['loading-view', 'main-view', 'progress-view', 'resume-view', 'final-view'];
+    function setView(viewId) {
+        views.forEach(id => document.getElementById(id).classList.toggle('hidden', id !== viewId));
+    }
+
+    function handleInitialState(state) {
+        if (state.resumable) {
+            document.getElementById('resumeFolderName').textContent = state.jobData.newFolderName;
+            setView('resume-view');
+        } else {
+            setView('main-view');
+        }
+    }
+
+    function startJob(isDryRun) {
+        const jobConfig = {
+            sourceFolderUrl: document.getElementById('sourceFolderUrl').value,
+            newFolderName: document.getElementById('newFolderName').value,
+            destinationFolderUrl: document.getElementById('destinationFolderUrl').value,
+            skipExisting: document.getElementById('skipExisting').checked,
+            isDryRun: isDryRun
+        };
+
+        if (!jobConfig.sourceFolderUrl || !jobConfig.newFolderName) {
+            alert('Folder Sumber dan Nama Folder Baru wajib diisi.');
+            return;
+        }
+
+        setView('progress-view');
+        document.getElementById('progress-title').textContent = isDryRun ? '🔬 Memvalidasi...' : '🛰️ Menyalin...';
+        google.script.run.withSuccessHandler(handleJobEnd).withFailureHandler(handleFailure).startCopyJob(jobConfig);
+    }
+    
+    // --- Event Listeners ---
+    document.getElementById('startCopyBtn').addEventListener('click', () => startJob(false));
+    document.getElementById('startDryRunBtn').addEventListener('click', () => startJob(true));
+    document.getElementById('resumeBtn').addEventListener('click', () => {
+        setView('progress-view');
+        google.script.run.withSuccessHandler(handleJobEnd).withFailureHandler(handleFailure).resumeCopyJob();
+    });
+    document.getElementById('resetBtn').addEventListener('click', () => {
+        if (confirm("Yakin ingin memulai baru? Progres tersimpan akan dihapus.")) {
+            setView('main-view');
+        }
+    });
+    document.getElementById('stopBtn').addEventListener('click', (e) => {
+        e.target.disabled = true;
+        e.target.innerHTML = '<span class="loader"></span> Menghentikan...';
+        google.script.run.requestStopProcess();
+    });
+
+
+    function handleJobEnd(result) {
+        setView('final-view');
+        const icon = document.getElementById('final-icon');
+        const title = document.getElementById('final-title');
+        const msg = document.getElementById('final-message');
+
+        if (result.status === 'completed') {
+            icon.textContent = '✅';
+            title.textContent = result.isDryRun ? 'Validasi Selesai' : 'Proses Selesai';
+            msg.innerHTML = result.isDryRun 
+                ? 'Simulasi selesai. Periksa sheet "Mission Control" untuk hasilnya.'
+                : `Penyalinan berhasil! Lihat <a href="${result.newFolderUrl}" target="_blank">folder baru Anda di sini</a>.`;
+        } else if (result.status === 'stopped') {
+            icon.textContent = '🟡';
+            title.textContent = 'Proses Dihentikan';
+            msg.textContent = 'Anda dapat melanjutkannya lagi nanti dengan membuka kembali remote control.';
+        }
+    }
+
+    function handleFailure(error) {
+        setView('final-view');
+        document.getElementById('final-icon').textContent = '⛔';
+        document.getElementById('final-title').textContent = 'Terjadi Error';
+        document.getElementById('final-message').textContent = `Terjadi kesalahan. Periksa sheet "Mission Control" untuk detail. Pesan: ${error.message}`;
+    }
+</script>
+</body>
+</html>
