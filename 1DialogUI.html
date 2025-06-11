@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <style>
+      body { font-family: sans-serif; }
+      .container { padding: 20px; }
+      .hidden { display: none; }
+      .form-group, .resume-prompt, .progress-view { margin-bottom: 15px; }
+      label { font-weight: bold; display: block; margin-bottom: 5px; }
+      input[type="text"] { width: 100%; box-sizing: border-box; }
+      .description { font-size: 12px; color: #666; margin-top: 5px; }
+      .final-status { margin-top: 20px; font-weight: bold; padding: 15px; border-radius: 5px; }
+      .success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; }
+      .error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; }
+      .info { color: #0c5460; background-color: #d1ecf1; border: 1px solid #bee5eb;}
+      
+      #progress-bar-wrapper { width: 100%; background-color: #f3f3f3; border: 1px solid #ccc; border-radius: 5px; }
+      #progress-bar { width: 0%; height: 24px; background-color: #4CAF50; text-align: center; line-height: 24px; color: white; border-radius: 5px; transition: width 0.4s ease; }
+      #status-text { margin-top: 8px; font-size: 13px; color: #333; height: 2.5em; overflow: hidden; }
+      .button-group button { margin-right: 10px; }
+      .loader { border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid #3498db; width: 20px; height: 20px; animation: spin 2s linear infinite; display: inline-block; vertical-align: middle; margin-right: 10px;}
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loading-view">
+            <div class="loader"></div><span>Memeriksa status...</span>
+        </div>
+
+        <!-- Opsi jika ada proses yang bisa dilanjutkan -->
+        <div id="resume-view" class="hidden">
+            <h4>Lanjutkan Proses?</h4>
+            <div class="info resume-prompt">
+                Ditemukan proses penyalinan untuk folder "<b><span id="resumeFolderName"></span></b>" yang belum selesai.
+                <br>Progres: <span id="resumeProgress"></span>%
+            </div>
+            <div class="button-group">
+                <button id="resumeButton" class="action">Lanjutkan</button>
+                <button id="startButton" class="blue">Mulai Baru</button>
+            </div>
+        </div>
+
+        <!-- Form untuk memulai proses baru -->
+        <div id="form-view" class="hidden">
+            <h3>Copy Folder Google Drive</h3>
+            <form id="copyForm">
+                <div class="form-group">
+                    <label for="sourceFolder">URL atau ID Folder Sumber</label>
+                    <input type="text" id="sourceFolder" name="sourceFolder" required>
+                </div>
+                <div class="form-group">
+                    <label for="newFolderName">Nama Folder Baru</label>
+                    <input type="text" id="newFolderName" name="newFolderName" required>
+                </div>
+                <div class="form-group">
+                    <label for="destinationFolder">URL/ID Folder Tujuan (Opsional)</label>
+                    <input type="text" id="destinationFolder" name="destinationFolder">
+                    <div class="description">Kosongkan untuk menyimpan di "My Drive".</div>
+                </div>
+                <button type="submit" class="action">Mulai Copy</button>
+            </form>
+        </div>
+
+        <!-- Tampilan saat proses berjalan -->
+        <div id="progress-view" class="hidden">
+            <h4>Sedang Memproses...</h4>
+            <p>Jangan tutup jendela ini. Anda bisa menghentikan proses kapan saja.</p>
+            <div id="progress-bar-wrapper">
+                <div id="progress-bar">0%</div>
+            </div>
+            <div id="status-text">Menginisialisasi...</div>
+            <div class="button-group" style="margin-top: 20px;">
+                <button id="stopButton" class="red">Stop</button>
+            </div>
+        </div>
+        
+        <!-- Status akhir setelah selesai, gagal, atau dihentikan -->
+        <div id="final-status-view" class="hidden">
+            <div id="final-status-box" class="final-status"></div>
+            <div class="button-group" style="margin-top: 15px;">
+              <button id="resetButton" class="action">Lakukan Copy Lain</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    let poller;
+
+    // MAIN ENTRY POINT
+    document.addEventListener("DOMContentLoaded", function() {
+        google.script.run.withSuccessHandler(handleInitialState).getInitialState();
+    });
+
+    function handleInitialState(state) {
+        document.getElementById('loading-view').classList.add('hidden');
+        if (state.resumable) {
+            document.getElementById('resumeFolderName').textContent = state.newFolderName;
+            document.getElementById('resumeProgress').textContent = Math.round((state.processed/state.total) * 100);
+            document.getElementById('resume-view').classList.remove('hidden');
+        } else {
+            document.getElementById('form-view').classList.remove('hidden');
+        }
+    }
+
+    // EVENT LISTENERS
+    document.getElementById('copyForm').addEventListener('submit', startNewProcess);
+    document.getElementById('resumeButton').addEventListener('click', resumeProcess);
+    document.getElementById('startButton').addEventListener('click', confirmStartNew);
+    document.getElementById('stopButton').addEventListener('click', stopProcess);
+    document.getElementById('resetButton').addEventListener('click', () => location.reload());
+
+    function setUiState(state) {
+        ['resume-view', 'form-view', 'progress-view', 'final-status-view'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
+        if (state) {
+            document.getElementById(state).classList.remove('hidden');
+        }
+    }
+
+    function confirmStartNew() {
+        if (confirm("Apakah Anda yakin ingin memulai proses baru? Progres sebelumnya akan hilang.")) {
+            setUiState('loading-view');
+            google.script.run.withSuccessHandler(() => setUiState('form-view')).clearPreviousJob();
+        }
+    }
+
+    function startNewProcess(event) {
+        event.preventDefault();
+        setUiState('progress-view');
+        startPolling();
+        
+        const source = document.getElementById("sourceFolder").value;
+        const newName = document.getElementById("newFolderName").value;
+        const dest = document.getElementById("destinationFolder").value;
+        google.script.run.withSuccessHandler(handleProcessEnd).withFailureHandler(handleFailure).prepareAndStartCopyProcess(source, newName, dest);
+    }
+    
+    function resumeProcess() {
+        setUiState('progress-view');
+        startPolling();
+        google.script.run.withSuccessHandler(handleProcessEnd).withFailureHandler(handleFailure).resumeCopyProcess();
+    }
+
+    function stopProcess() {
+        document.getElementById('stopButton').disabled = true;
+        document.getElementById('status-text').textContent = 'Meminta untuk berhenti...';
+        google.script.run.requestStopProcess();
+    }
+
+    function startPolling() {
+        poller = setInterval(updateProgress, 1500);
+    }
+
+    function updateProgress() {
+        google.script.run.withSuccessHandler(showProgress).getCopyProgress();
+    }
+
+    function showProgress(status) {
+        const percentage = Math.round(status.percentage);
+        document.getElementById('progress-bar').style.width = percentage + '%';
+        document.getElementById('progress-bar').textContent = percentage + '%';
+        document.getElementById('status-text').textContent = `(${status.processed}/${status.total}) ${status.statusMessage}`;
+        
+        // Jika server mengkonfirmasi proses berhenti
+        if (status.stopRequested) {
+            handleProcessEnd({status: 'stopped'});
+        }
+    }
+
+    function handleProcessEnd(result) {
+        clearInterval(poller);
+        setUiState('final-status-view');
+        const box = document.getElementById('final-status-box');
+        
+        if (result.status === 'completed') {
+            box.className = 'final-status success';
+            box.innerHTML = `✅ Berhasil! Folder telah selesai disalin.
+                             <br><br><a href="${result.newFolderUrl}" target="_blank">Buka Folder Baru</a>
+                             <br><a href="${result.logSheetUrl}" target="_blank">Lihat Log di Spreadsheet</a>`;
+        } else if (result.status === 'stopped') {
+            box.className = 'final-status info';
+            box.innerHTML = `🟡 Proses dihentikan. Anda dapat melanjutkannya nanti dengan membuka kembali alat ini.`;
+        }
+    }
+
+    function handleFailure(error) {
+        clearInterval(poller);
+        setUiState('final-status-view');
+        const box = document.getElementById('final-status-box');
+        box.className = 'final-status error';
+        box.innerHTML = `❌ Gagal: ${error.message}. Anda mungkin bisa melanjutkannya nanti.`;
+    }
+</script>
+
+</body>
+</html>
